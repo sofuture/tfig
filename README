@@ -1,0 +1,17 @@
+tfig - terminal figures
+=======================
+
+Usage Example
+-------------
+
+$ seq 1 5 | awk '{print $1, $1*$1}' | tfig -x 0 -X 5 -y 0 -Y 5 -h 5 -w 5 -s ?
+
+Expected Output
+---------------
+
+| ?
+|
+|
+|?
++_____
+
