@@ -3,7 +3,9 @@
 #include <unistd.h>
 #include <ncurses.h>
 
-#define DEBUG 1
+#include "ll.h"
+
+#define DEBUG 0
 
 typedef struct settings {
     int xmin;
@@ -15,16 +17,17 @@ typedef struct settings {
     char* sym;
 } settings;
 
-typedef struct dp {
-    int x;
-    int y;
-} dp;
-
+/*
+ * print out usage
+ */
 static void usage(){
     printf("tfig -x xMin -X xMax -y yMin -Y yMax");
     printf(" -w width -h height -s symbol\n");
 }
 
+/*
+ * alloc and set defaults for settings struct
+ */
 static settings *init_settings(){
     settings *st = (settings *) malloc(sizeof(settings));
     st->xmin = 0;
@@ -37,7 +40,10 @@ static settings *init_settings(){
     return st;
 }
 
-static settings* parse_opts(int argc, char **argv){
+/*
+ * parse getopts for graph settings
+ */
+static settings *parse_opts(int argc, char **argv){
     int c;
     settings* s = init_settings();
     while((c = getopt(argc, argv, "x:X:y:Y:h:w:s:?")) != -1){
@@ -55,7 +61,7 @@ static settings* parse_opts(int argc, char **argv){
             case 'h':
                 s->height = atoi(optarg); break;
             case 's':
-                s->sym = (char*) optarg; break;
+                s->sym = (char *) optarg; break;
             case ':':
             default:
                 usage();
@@ -75,29 +81,64 @@ static settings* parse_opts(int argc, char **argv){
     return s;
 }
 
-static dp* load_data(int size){
-
-    dp* dat = (dp *) malloc(sizeof(dp)*size);
-    int n, i = 0;
+/*
+ * load rows of data from stdin
+ * assume we have <size> rows
+ * assume we are given an even number of integers
+ */
+static List *load_data(){
+    List *list = emptylist();
+    int x, y, n, i = 0;
 
     while(scanf("%d", &n) == 1) {
-        if(i%2 == 0)
-            dat[i/2].x = n;
-        else
-            dat[(i-1)/2].y = n;
+        if(i % 2 == 0) {
+            x = n;
+        } else { 
+            y = n;
+            add(x, y, list);
+        }
         i++;
     }
 
-    return dat;
+    if(DEBUG){
+        Node *c;
+        c = list->head;
+        while(c->next != NULL){
+            printf("pt: %d %d\n", c->x, c->y);
+            c = c->next;
+        }
+    }
+
+    return list;
 }
 
-static void draw_data(dp* dat, settings* set){
+/*
+ * draw out a graph of the data that we have loaded
+ */
+static void draw_data(List *dat, settings *set){
+    int dp[set->height][set->width];
 
-    printf("\n");
+    /* is there really not a better way to do this?
+     * i don't believe that for a second!
+     */
+    for(int i=0; i < set->height; i++)
+        for(int j=0; j < set->width; j++)
+            dp[i][j] = 0;
+    
+    /*
+     * load the data points into a form we can draw from more easily
+     */
+    Node *c = dat->head;
+    while(c->next != NULL){
+        if(c->y < set->height && c->x <= set->width){
+            dp[c->y][c->x] = 1;
+        }
+        c = c->next;
+    }
 
     for(int i = 0; i < set->height + 1; i++) {
         for(int j = 0; j < set->width + 1; j++) {
-       
+
             /* borders */
             if(j == 0) {
                 if(i == set->height) printf("+");
@@ -105,36 +146,27 @@ static void draw_data(dp* dat, settings* set){
             } else if(i == set->height) {
                 printf("-");
             } else {
-                /* data */
-                int y = dat[j-1].y;
-                
-                if(set->height - (y+1) == i)
-                    printf("%s",set->sym);
+
+                /* data points */
+                if(dp[set->height-(i+1)][j-1])
+                    printf("%s", set->sym);
                 else
                     printf(" ");
             }
-
         }
         printf("\n");
     }
-    printf("\n");
 }
 
 int main (int argc, char **argv) {
-    settings* set = parse_opts(argc, argv);
+    settings *set = parse_opts(argc, argv);
 
-    // assuming we get max - min data points (temporary)
-    int size = set->ymax - set->ymin;
-
-    dp* dat = load_data(size);
-
-    if(DEBUG){
-        for(int i=0;i<size;i++){
-            printf("pt: %d %d\n", dat[i].x, dat[i].y);
-        }
-    }
+    List *dat = load_data();
 
     draw_data(dat, set);
+
+    destroy(dat);
+    free(set);
 
     return 0;
 }
