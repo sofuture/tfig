@@ -5,8 +5,8 @@
 #include <stdlib.h>
 
 typedef struct node {
-    int x;
-    int y;
+    double x;
+    double y;
     struct node *next;
 } Node;
 
@@ -16,7 +16,7 @@ typedef struct list {
 } List;
 
 List *emptylist();
-void add(int x, int y, List *list);
+void add(double x, double y, List *list);
 void destroy(List *list);
 
 #endif

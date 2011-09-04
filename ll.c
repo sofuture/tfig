@@ -1,6 +1,6 @@
 #include "ll.h"
 
-Node *createnode(int x, int y){
+Node *createnode(double x, double y){
     Node *newNode = malloc(sizeof(Node));
     newNode->x = x;
     newNode->y = y;
@@ -15,7 +15,7 @@ List *emptylist(){
     return list;
 }
 
-void add(int x, int y, List *list){
+void add(double x, double y, List *list){
     Node *current = NULL;
 
     if(list->head == NULL){

@@ -1,7 +1,10 @@
-* calculate range -> pixels
-    * create 2d array for screen 'pixels'
-    * calculate width/height of pixel
-    * run through data, put appropriate data in screen array
+X = done
+* = todo
+
+X calculate range -> pixels
+    X create 2d array for screen 'pixels'
+    X calculate width/height of pixel
+    X run through data, put appropriate data in screen array
 * draw array 'backwards' to avoid flipping
     * for(i=height;i>0;i--)
         for(j=0;j<width;j++)

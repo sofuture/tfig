@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <math.h>
 
 #include "ll.h"
 
@@ -87,9 +88,10 @@ static settings *parse_opts(int argc, char **argv){
  */
 static List *load_data(){
     List *list = emptylist();
-    int x, y, n, i = 0;
+    float x, y, n;
+    int i = 0;
 
-    while(scanf("%d", &n) == 1) {
+    while(scanf("%f", &n) == 1) {
         if(i % 2 == 0) {
             x = n;
         } else { 
@@ -103,7 +105,7 @@ static List *load_data(){
         Node *c;
         c = list->head;
         while(c->next != NULL){
-            printf("pt: %d %d\n", c->x, c->y);
+            printf("pt: %f %f\n", c->x, c->y);
             c = c->next;
         }
     }
@@ -115,7 +117,8 @@ static List *load_data(){
  * draw out a graph of the data that we have loaded
  */
 static void draw_data(List *dat, settings *set){
-    int dp[set->height][set->width];
+
+    short dp[set->height][set->width];
 
     /* is there really not a better way to do this?
      * i don't believe that for a second!
@@ -123,14 +126,32 @@ static void draw_data(List *dat, settings *set){
     for(int i=0; i < set->height; i++)
         for(int j=0; j < set->width; j++)
             dp[i][j] = 0;
-    
+
+    /* calculate 'pixel' height and width */
+    float dp_width = (set->xmax - set->xmin)/(float) set->width;
+    float dp_height = (set->ymax - set->ymin)/(float) set->height;
+
     /*
      * load the data points into a form we can draw from more easily
      */
     Node *c = dat->head;
+
     while(c->next != NULL){
-        if(c->y < set->height && c->x <= set->width){
-            dp[c->y][c->x] = 1;
+
+        if(c->y < set->ymax && 
+                c->y >= set->ymin &&
+                c->x < set->xmax && 
+                c->x >= set->xmin){
+
+            int px = (int) floor((c->x - set->xmin) / dp_width);
+            int py = (int) floor((c->y - set->ymin) / dp_height);
+
+            dp[py][px] = 1;
+
+            if(DEBUG) {
+                printf("pts: (x:%f y:%f) -> (px:%d py:%d)\n",
+                    c->x, c->y, px, py);
+            }
         }
         c = c->next;
     }

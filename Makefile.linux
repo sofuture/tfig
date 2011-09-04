@@ -2,7 +2,10 @@ tfig: tfig.c ll.c
 	cc tfig.c ll.c -std=c99 -o tfig -lm
 
 run: tfig
-	seq 1 20 | awk '{print $$1, $$1}' | ./tfig -x 0 -X 5 -y 0 -Y 5 -h 20 -w 20 -s ?
+	seq 1 40 | awk '{print $$1, $$1/2}' | ./tfig -x 10 -X 30 -y 10 -Y 30 -h 20 -w 40 -s ?
+	seq 1 5 | awk '{print $$1, $$1**$$1}' | ./tfig -x 0 -X 10 -y 0 -Y 10 -h 10 -w 10 -s ?
+	seq 1 20 | awk '{print $$1, $$1}' | ./tfig -x 0 -X 30 -y 0 -Y 30 -h 20 -w 40 -s ?
+	seq 1 40 | awk '{print $$1, $$1*2}' | ./tfig -x 0 -X 30 -y 0 -Y 30 -h 20 -w 40 -s ?
 
 clean:
 	rm tfig
