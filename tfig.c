@@ -104,7 +104,7 @@ static List *load_data(){
     if(DEBUG){
         Node *c;
         c = list->head;
-        while(c->next != NULL){
+        while(c != NULL){
             printf("pt: %f %f\n", c->x, c->y);
             c = c->next;
         }
@@ -136,7 +136,7 @@ static void draw_data(List *dat, settings *set){
      */
     Node *c = dat->head;
 
-    while(c->next != NULL){
+    while(c != NULL){
 
         if(c->y < set->ymax && 
                 c->y >= set->ymin &&
