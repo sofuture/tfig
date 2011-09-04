@@ -1,6 +1,10 @@
 tfig - terminal figures
 =======================
 
+Platform Support
+----------------
+ln -s Makefile.<platform> Makefile
+
 Usage Example
 -------------
 
