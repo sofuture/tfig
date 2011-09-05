@@ -157,7 +157,7 @@ static void draw_data(List *dat, settings *set){
     }
 
     printf("+");
-    for(j = 1; j < set->width; j++){ printf("-"); }
+    for(j = 0; j < set->width; j++){ printf("-"); }
     printf("\n");
 }
 
