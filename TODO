@@ -8,5 +8,5 @@ X calculate range -> pixels
 
 X draw array 'backwards' to avoid flipping
 
-* uhm, actually work on linux
-    * parse command line opts correctly
+X uhm, actually work on linux
+    X parse command line opts correctly
