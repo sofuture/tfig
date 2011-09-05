@@ -45,7 +45,7 @@ static settings *init_settings(){
  */
 static settings *parse_opts(int argc, char **argv){
     int c;
-    char *optarg;
+    extern char *optarg;
     settings *s = init_settings();
 
     while((c = getopt(argc, argv, "x:X:y:Y:h:w:s:?")) != -1){
