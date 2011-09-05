@@ -46,25 +46,19 @@ static settings *init_settings(){
 static settings *parse_opts(int argc, char **argv){
     int c;
     settings* s = init_settings();
+
     while((c = getopt(argc, argv, "x:X:y:Y:h:w:s:?")) != -1){
         switch (c) {
-            case 'x':
-                s->xmin = atoi(optarg); break;
-            case 'X':
-                s->xmax = atoi(optarg); break;
-            case 'y':
-                s->ymin = atoi(optarg); break;
-            case 'Y':
-                s->ymax = atoi(optarg); break;
-            case 'w':
-                s->width = atoi(optarg); break;
-            case 'h':
-                s->height = atoi(optarg); break;
-            case 's':
-                s->sym = (char *) optarg; break;
+            case 'x': s->xmin = atoi(optarg); break;
+            case 'X': s->xmax = atoi(optarg); break;
+            case 'y': s->ymin = atoi(optarg); break;
+            case 'Y': s->ymax = atoi(optarg); break;
+            case 'w': s->width = atoi(optarg); break;
+            case 'h': s->height = atoi(optarg); break;
+            case 's': s->sym = (char *) optarg; break;
+
             case ':':
-            default:
-                usage();
+            default: usage();
         }
     }
 
@@ -117,12 +111,9 @@ static List *load_data(){
  * draw out a graph of the data that we have loaded
  */
 static void draw_data(List *dat, settings *set){
+    char dp[set->height][set->width];
 
-    short dp[set->height][set->width];
-
-    /* is there really not a better way to do this?
-     * i don't believe that for a second!
-     */
+    // is there really not a better way to do this?
     for(int i=0; i < set->height; i++)
         for(int j=0; j < set->width; j++)
             dp[i][j] = 0;
@@ -131,11 +122,8 @@ static void draw_data(List *dat, settings *set){
     float dp_width = (set->xmax - set->xmin)/(float) set->width;
     float dp_height = (set->ymax - set->ymin)/(float) set->height;
 
-    /*
-     * load the data points into a form we can draw from more easily
-     */
+    // load the data points into a form we can draw from more easily
     Node *c = dat->head;
-
     while(c != NULL){
 
         // only care about points we can see
@@ -147,7 +135,6 @@ static void draw_data(List *dat, settings *set){
             // find out which cell to place a mark in
             int px = (int) floor((c->x - set->xmin) / dp_width);
             int py = (int) floor((c->y - set->ymin) / dp_height);
-
             dp[py][px] = 1;
 
             if(DEBUG) {
