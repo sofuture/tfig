@@ -138,11 +138,13 @@ static void draw_data(List *dat, settings *set){
 
     while(c != NULL){
 
+        // only care about points we can see
         if(c->y < set->ymax && 
                 c->y >= set->ymin &&
                 c->x < set->xmax && 
                 c->x >= set->xmin){
 
+            // find out which cell to place a mark in
             int px = (int) floor((c->x - set->xmin) / dp_width);
             int py = (int) floor((c->y - set->ymin) / dp_height);
 
@@ -156,26 +158,20 @@ static void draw_data(List *dat, settings *set){
         c = c->next;
     }
 
-    for(int i = 0; i < set->height + 1; i++) {
-        for(int j = 0; j < set->width + 1; j++) {
-
-            /* borders */
-            if(j == 0) {
-                if(i == set->height) printf("+");
-                else printf("|");
-            } else if(i == set->height) {
-                printf("-");
-            } else {
-
-                /* data points */
-                if(dp[set->height-(i+1)][j-1])
-                    printf("%s", set->sym);
-                else
-                    printf(" ");
-            }
+    // arguably a sane way to draw: 'backwards'
+    int i=0, j=0;
+    for(i = set->height-1; i >= 0; i--){
+        printf("|");
+        for(j = 0; j < set->width; j++){
+            if(dp[i][j]) printf("%s", set->sym);
+            else printf(" ");
         }
         printf("\n");
     }
+
+    printf("+");
+    for(j = 1; j < set->width; j++){ printf("-"); }
+    printf("\n");
 }
 
 int main (int argc, char **argv) {
