@@ -12,8 +12,8 @@ typedef struct list {
     int ct;
 } list;
 
-list *emptylist();
-void add(double x, double y, list *list);
-void destroy(list *list);
+list *ll_new();
+void ll_add(double x, double y, list *list);
+void ll_free(list *list);
 
 #endif

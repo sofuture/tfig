@@ -11,14 +11,14 @@ node *createnode(double x, double y){
     return newNode;
 }
 
-list *emptylist(){
+list *ll_new(){
     list *list = malloc(sizeof(list));
     list->head = NULL;
     list->ct = 0;
     return list;
 }
 
-void add(double x, double y, list *list){
+void ll_add(double x, double y, list *list){
     node *current = NULL;
 
     if(list->head == NULL){
@@ -33,7 +33,7 @@ void add(double x, double y, list *list){
     list->ct++;
 }
 
-void destroy(list * list){
+void ll_free(list * list){
     node *current = list->head;
     node *next = current;
     while(current != NULL){

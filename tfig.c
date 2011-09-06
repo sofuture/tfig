@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
 #include <math.h>
 
 #include "ll.h"
@@ -21,8 +22,9 @@ typedef struct settings {
  * print out usage
  */
 static void usage(){
-    printf("tfig -x xMin -X xMax -y yMin -Y yMax");
-    printf(" -w width -h height -s symbol\n");
+    fprintf(stderr, "tfig -x xMin -X xMax -y yMin -Y yMax"
+                    " -w width -h height -s symbol\n");
+    exit(1);
 }
 
 /*
@@ -82,7 +84,7 @@ static settings *parse_opts(int argc, char **argv){
  * assume we are given an even number of integers
  */
 static list *load_data(){
-    list *list = emptylist();
+    list *list = ll_new();
     float x, y, n;
     int i = 0;
 
@@ -91,17 +93,14 @@ static list *load_data(){
             x = n;
         } else { 
             y = n;
-            add(x, y, list);
+            ll_add(x, y, list);
         }
         i++;
     }
 
     if(DEBUG){
-        node *c;
-        c = list->head;
-        while(c != NULL){
+        for(node *c = list->head; c; c = c->next){
             printf("pt: %f %f\n", c->x, c->y);
-            c = c->next;
         }
     }
 
@@ -113,25 +112,18 @@ static list *load_data(){
  */
 static void draw_data(list *dat, settings *set){
     char dp[set->height][set->width];
-
-    // is there really not a better way to do this?
-    for(int i=0; i < set->height; i++)
-        for(int j=0; j < set->width; j++)
-            dp[i][j] = 0;
+    memset(dp, 0, set->width * set->height * sizeof(char));
 
     /* calculate 'pixel' height and width */
     float dp_width = (set->xmax - set->xmin)/(float) set->width;
     float dp_height = (set->ymax - set->ymin)/(float) set->height;
 
     // load the data points into a form we can draw from more easily
-    node *c = dat->head;
-    while(c != NULL){
+    for(node *c = dat->head; c; c = c->next){
 
         // only care about points we can see
-        if(c->y < set->ymax && 
-                c->y >= set->ymin &&
-                c->x < set->xmax && 
-                c->x >= set->xmin){
+        if(c->x >= set->xmin && c->x < set->xmax &&
+                c->y >= set->ymin && c->y < set->ymax) {
 
             // find out which cell to place a mark in
             int px = (int) floor((c->x - set->xmin) / dp_width);
@@ -143,7 +135,6 @@ static void draw_data(list *dat, settings *set){
                     c->x, c->y, px, py);
             }
         }
-        c = c->next;
     }
 
     // arguably a sane way to draw: 'backwards'
@@ -169,7 +160,7 @@ int main (int argc, char **argv) {
 
     draw_data(dat, set);
 
-    destroy(dat);
+    ll_free(dat);
     free(set);
 
     return 0;
