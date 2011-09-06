@@ -1,22 +1,19 @@
 #ifndef LL_HEADER
 #define LL_HEADER
 
-#include <stdio.h>
-#include <stdlib.h>
-
 typedef struct node {
     double x;
     double y;
     struct node *next;
-} Node;
+} node;
 
 typedef struct list {
-    Node *head;
+    node *head;
     int ct;
-} List;
+} list;
 
-List *emptylist();
-void add(double x, double y, List *list);
-void destroy(List *list);
+list *emptylist();
+void add(double x, double y, list *list);
+void destroy(list *list);
 
 #endif

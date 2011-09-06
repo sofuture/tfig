@@ -1,22 +1,25 @@
+#include <stdio.h>
+#include <stdlib.h>
+
 #include "ll.h"
 
-Node *createnode(double x, double y){
-    Node *newNode = malloc(sizeof(Node));
+node *createnode(double x, double y){
+    node *newNode = malloc(sizeof(node));
     newNode->x = x;
     newNode->y = y;
     newNode->next = NULL;
     return newNode;
 }
 
-List *emptylist(){
-    List *list = malloc(sizeof(List));
+list *emptylist(){
+    list *list = malloc(sizeof(list));
     list->head = NULL;
     list->ct = 0;
     return list;
 }
 
-void add(double x, double y, List *list){
-    Node *current = NULL;
+void add(double x, double y, list *list){
+    node *current = NULL;
 
     if(list->head == NULL){
         list->head = createnode(x, y);
@@ -30,9 +33,9 @@ void add(double x, double y, List *list){
     list->ct++;
 }
 
-void destroy(List * list){
-    Node *current = list->head;
-    Node *next = current;
+void destroy(list * list){
+    node *current = list->head;
+    node *next = current;
     while(current != NULL){
         next = current->next;
         free(current);

@@ -81,8 +81,8 @@ static settings *parse_opts(int argc, char **argv){
  * assume we have <size> rows
  * assume we are given an even number of integers
  */
-static List *load_data(){
-    List *list = emptylist();
+static list *load_data(){
+    list *list = emptylist();
     float x, y, n;
     int i = 0;
 
@@ -97,7 +97,7 @@ static List *load_data(){
     }
 
     if(DEBUG){
-        Node *c;
+        node *c;
         c = list->head;
         while(c != NULL){
             printf("pt: %f %f\n", c->x, c->y);
@@ -111,7 +111,7 @@ static List *load_data(){
 /*
  * draw out a graph of the data that we have loaded
  */
-static void draw_data(List *dat, settings *set){
+static void draw_data(list *dat, settings *set){
     char dp[set->height][set->width];
 
     // is there really not a better way to do this?
@@ -124,7 +124,7 @@ static void draw_data(List *dat, settings *set){
     float dp_height = (set->ymax - set->ymin)/(float) set->height;
 
     // load the data points into a form we can draw from more easily
-    Node *c = dat->head;
+    node *c = dat->head;
     while(c != NULL){
 
         // only care about points we can see
@@ -165,7 +165,7 @@ static void draw_data(List *dat, settings *set){
 int main (int argc, char **argv) {
     settings *set = parse_opts(argc, argv);
 
-    List *dat = load_data();
+    list *dat = load_data();
 
     draw_data(dat, set);
 
