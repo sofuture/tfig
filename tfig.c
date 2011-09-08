@@ -6,6 +6,10 @@
 
 #include "ll.h"
 
+#define bool char
+#define true 1
+#define false 0
+
 #define DEBUG 0
 
 typedef struct settings {
@@ -15,6 +19,7 @@ typedef struct settings {
     int ymax;
     int height;
     int width;
+    bool asize;
     char* sym;
 } settings;
 
@@ -38,6 +43,7 @@ static settings *init_settings(){
     st->ymax = 60;
     st->height = 20;
     st->width = 60;
+    st->asize = true;
     st->sym = "#";
     return st;
 }
@@ -46,16 +52,18 @@ static settings *init_settings(){
  * parse getopts for graph settings
  */
 static settings *parse_opts(int argc, char **argv){
-    int c;
+    int c = 0;
     extern char *optarg;
     settings *s = init_settings();
 
+    bool specdim = false;
+
     while((c = getopt(argc, argv, "x:X:y:Y:h:w:s:?")) != -1){
         switch (c) {
-            case 'x': s->xmin = atoi(optarg); break;
-            case 'X': s->xmax = atoi(optarg); break;
-            case 'y': s->ymin = atoi(optarg); break;
-            case 'Y': s->ymax = atoi(optarg); break;
+            case 'x': s->xmin = atoi(optarg); specdim = true; break;
+            case 'X': s->xmax = atoi(optarg); specdim = true; break;
+            case 'y': s->ymin = atoi(optarg); specdim = true; break;
+            case 'Y': s->ymax = atoi(optarg); specdim = true; break;
             case 'w': s->width = atoi(optarg); break;
             case 'h': s->height = atoi(optarg); break;
             case 's': s->sym = (char *) optarg; break;
@@ -63,6 +71,13 @@ static settings *parse_opts(int argc, char **argv){
             case ':':
             default: usage();
         }
+    }
+
+    // don't autoscale if dimensions specified
+    s->asize = !specdim;
+    if(s->asize) {
+        s->xmin = 0; s->xmax = 0;
+        s->ymin = 0; s->ymax = 0;
     }
 
     if(DEBUG) {
@@ -83,24 +98,41 @@ static settings *parse_opts(int argc, char **argv){
  * assume we have <size> rows
  * assume we are given an even number of integers
  */
-static list *load_data(){
+static list *load_data(settings *s){
     list *list = ll_new();
-    float x, y, n;
+    double x = 0.0, y = 0.0, n = 0.0;
     int i = 0;
 
-    while(scanf("%f", &n) == 1) {
+    while(scanf("%lf", &n) == 1) {
         if(i % 2 == 0) {
             x = n;
         } else { 
             y = n;
             ll_add(x, y, list);
         }
+
+        if(s->asize) {
+            if(x > s->xmax) s->xmax = (int) x + 1;
+            else if(x < s->xmin) s->xmin = (int) x - 1;
+
+            if(y > s->ymax) s->ymax = (int) y + 1;
+            else if(y < s->ymin) s->ymin = (int) y - 1;
+        }
+
         i++;
     }
 
     if(DEBUG){
         for(node *c = list->head; c; c = c->next){
             printf("pt: %f %f\n", c->x, c->y);
+        }
+
+        if(s->asize){
+            printf("auto size results:\n");
+            printf("x min: %d\n", s->xmin);
+            printf("x max: %d\n", s->xmax);
+            printf("y min: %d\n", s->ymin);
+            printf("y max: %d\n", s->ymax);
         }
     }
 
@@ -111,12 +143,12 @@ static list *load_data(){
  * draw out a graph of the data that we have loaded
  */
 static void draw_data(list *dat, settings *set){
-    char dp[set->height][set->width];
-    memset(dp, 0, set->width * set->height * sizeof(char));
+    bool dp[set->height][set->width];
+    memset(dp, 0, set->width * set->height * sizeof(bool));
 
     /* calculate 'pixel' height and width */
-    float dp_width = (set->xmax - set->xmin)/(float) set->width;
-    float dp_height = (set->ymax - set->ymin)/(float) set->height;
+    double dp_width = (set->xmax - set->xmin)/(double) set->width;
+    double dp_height = (set->ymax - set->ymin)/(double) set->height;
 
     // load the data points into a form we can draw from more easily
     for(node *c = dat->head; c; c = c->next){
@@ -128,7 +160,7 @@ static void draw_data(list *dat, settings *set){
             // find out which cell to place a mark in
             int px = (int) floor((c->x - set->xmin) / dp_width);
             int py = (int) floor((c->y - set->ymin) / dp_height);
-            dp[py][px] = 1;
+            dp[py][px] = true;
 
             if(DEBUG) {
                 printf("pts: (x:%f y:%f) -> (px:%d py:%d)\n",
@@ -156,7 +188,7 @@ static void draw_data(list *dat, settings *set){
 int main (int argc, char **argv) {
     settings *set = parse_opts(argc, argv);
 
-    list *dat = load_data();
+    list *dat = load_data(set);
 
     draw_data(dat, set);
 
