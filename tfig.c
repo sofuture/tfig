@@ -4,6 +4,9 @@
 #include <unistd.h>
 #include <string.h>
 #include <math.h>
+#ifdef __linux__
+#include <sys/ioctl.h>
+#endif
 
 #include "ll.h"
 
@@ -27,8 +30,8 @@ static int _getdims(int fd) {
     struct winsize ws;
     if(ioctl(fd, TIOCGWINSZ, &ws)) { perror(""); return -1; }
     if(ws.ws_col > 0) {
-        win_width = ws.ts_col;
-        win_height = ws.ts_row;
+        win_width = ws.ws_col;
+        win_height = ws.ws_row;
         win_mode = 1 + fd;
 		return 0;
     }
