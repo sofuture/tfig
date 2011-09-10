@@ -37,7 +37,6 @@ static int _getdims(int fd) {
 
 static void getdims() {
     int retval, rows, cols;
-    char foo[100];
     FILE *f;
     win_mode = 0;
     retval = 0;
@@ -54,7 +53,7 @@ static void getdims() {
 #define STTY(x, y) \
     if((f = popen("stty " x " size", "r"))!=NULL) { \
         if(fscanf(f, "%d %d", &rows, &cols) > 0 && cols>0) \
-            { win_height = rows; win_width = cols; win_mode = y; return; }\
+            { win_height = rows; win_width = cols; win_mode = y; pclose(f); return; } pclose(f);\
     }
     STTY("-f /dev/stderr", 5)
     STTY("", 6)
