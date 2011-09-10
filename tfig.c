@@ -10,7 +10,59 @@ typedef char bool;
 #define true 1
 #define false 0
 
-#define DEBUG 0
+int win_width, win_height, win_mode;
+
+static int _getdims(int fd) {
+#ifdef TIOCGSIZE
+    struct ttysize ts;
+    if(ioctl(fd, TIOCGSIZE, &ts)) { perror(""); return -1; }
+    if(ts.ts_cols > 0) { 
+        win_width = ts.ts_cols;
+        win_height = ts.ts_lines;
+		win_mode = 1 + fd;
+		return 0;
+    }
+#elif defined(TIOCGWINSZ)
+    struct winsize ws;
+    if(ioctl(fd, TIOCGWINSZ, &ws)) { perror(""); return -1; }
+    if(ws.ws_col > 0) {
+        win_width = ws.ts_col;
+        win_height = ws.ts_row;
+        win_mode = 1 + fd;
+		return 0;
+    }
+#endif
+    return -1;
+}
+
+static void getdims() {
+    int retval, rows, cols;
+    char foo[100];
+    FILE *f;
+    win_mode = 0;
+    retval = 0;
+#define GETCOLS(x) \
+    if(isatty(x) && ((retval = _getdims(x)) != -1)) return; 
+    GETCOLS(STDIN_FILENO)
+    GETCOLS(STDOUT_FILENO)
+    GETCOLS(STDERR_FILENO)
+    if(getenv("COLUMNS") && getenv("LINES")) {
+		win_width = atoi(getenv("COLUMNS"));
+		win_height= atoi(getenv("LINES"));
+		if(win_width > 0 && win_height > 0) { win_mode = 4; return; }
+	}
+#define STTY(x, y) \
+    if((f = popen("stty " x " size", "r"))!=NULL) { \
+        if(fscanf(f, "%d %d", &rows, &cols) > 0 && cols>0) \
+            { win_height = rows; win_width = cols; win_mode = y; return; }\
+    }
+    STTY("-f /dev/stderr", 5)
+    STTY("", 6)
+    STTY("-f /dev/stdout", 7)
+    win_width = win_height = 0;
+    win_mode = 8;
+    return;
+}
 
 typedef struct settings {
     int xmin;
@@ -23,37 +75,35 @@ typedef struct settings {
     char* sym;
 } settings;
 
-/*
- * print out usage
- */
-static void usage(){
-    fprintf(stderr, "tfig -x xMin -X xMax -y yMin -Y yMax"
-                    " -w width -h height -s symbol\n");
+/* print out usage */
+static void usage(const char * const prog){
+    fprintf(stderr, "%s -x xMin -X xMax -y yMin -Y yMax"
+                    " -w width -h height -s symbol\n", prog);
     exit(1);
 }
 
-/*
- * alloc and set defaults for settings struct
- */
+/* alloc and set defaults for settings struct */
 static settings *init_settings(){
     settings *st = (settings *) malloc(sizeof(settings));
+    getdims();
+#ifdef DEBUG 
+    printf("window settings: width= %d height= %d mode= %d\n", 
+        win_width, win_height, win_mode);
+#endif
+    st->height = (win_height == 0 ? 20 : win_height - 1);
+    st->width = (win_width == 0 ? 60 : win_width - 1);
     st->xmin = 0;
-    st->xmax = 20;
+    st->xmax = st->height;
     st->ymin = 0;
-    st->ymax = 60;
-    st->height = 20;
-    st->width = 60;
+    st->ymax = st->width;
     st->asize = true;
     st->sym = "#";
     return st;
 }
 
-/*
- * parse getopts for graph settings
- */
+/* parse getopts for graph settings */
 static settings *parse_opts(int argc, char **argv){
     int c = 0;
-    extern char *optarg;
     settings *s = init_settings();
 
     bool specdim = false;
@@ -67,9 +117,8 @@ static settings *parse_opts(int argc, char **argv){
             case 'w': s->width = atoi(optarg); break;
             case 'h': s->height = atoi(optarg); break;
             case 's': s->sym = (char *) optarg; break;
-
             case ':':
-            default: usage();
+            default: usage(argv[0]);
         }
     }
 
@@ -80,15 +129,15 @@ static settings *parse_opts(int argc, char **argv){
         s->ymin = 0; s->ymax = 0;
     }
 
-    if(DEBUG) {
-        printf("x min: %d\n", s->xmin);
-        printf("x max: %d\n", s->xmax);
-        printf("y min: %d\n", s->ymin);
-        printf("y max: %d\n", s->ymax);
-        printf("height: %d\n", s->height);
-        printf("width: %d\n", s->width);
-        printf("symbol: %s\n", s->sym);
-    }
+#ifdef DEBUG
+    printf("x min: %d\n", s->xmin);
+    printf("x max: %d\n", s->xmax);
+    printf("y min: %d\n", s->ymin);
+    printf("y max: %d\n", s->ymax);
+    printf("height: %d\n", s->height);
+    printf("width: %d\n", s->width);
+    printf("symbol: %s\n", s->sym);
+#endif
 
     return s;
 }
@@ -122,26 +171,23 @@ static list *load_data(settings *s){
         i++;
     }
 
-    if(DEBUG){
-        for(node *c = list->head; c; c = c->next){
-            printf("pt: %f %f\n", c->x, c->y);
-        }
-
-        if(s->asize){
-            printf("auto size results:\n");
-            printf("x min: %d\n", s->xmin);
-            printf("x max: %d\n", s->xmax);
-            printf("y min: %d\n", s->ymin);
-            printf("y max: %d\n", s->ymax);
-        }
+#ifdef DEBUG
+    for(node *c = list->head; c; c = c->next){
+        printf("pt: %f %f\n", c->x, c->y);
     }
 
+    if(s->asize){
+        printf("auto size results:\n");
+        printf("x min: %d\n", s->xmin);
+        printf("x max: %d\n", s->xmax);
+        printf("y min: %d\n", s->ymin);
+        printf("y max: %d\n", s->ymax);
+    }
+#endif
     return list;
 }
 
-/*
- * draw out a graph of the data that we have loaded
- */
+/* draw out a graph of the data that we have loaded */
 static void draw_data(list *dat, settings *set){
     bool dp[set->height][set->width];
     memset(dp, 0, set->width * set->height * sizeof(bool));
@@ -162,10 +208,10 @@ static void draw_data(list *dat, settings *set){
             int py = (int) floor((c->y - set->ymin) / dp_height);
             dp[py][px] = true;
 
-            if(DEBUG) {
-                printf("pts: (x:%f y:%f) -> (px:%d py:%d)\n",
-                    c->x, c->y, px, py);
-            }
+#ifdef DEBUG
+            printf("pts: (x:%f y:%f) -> (px:%d py:%d)\n",
+                c->x, c->y, px, py);
+#endif
         }
     }
 

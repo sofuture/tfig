@@ -8,7 +8,7 @@ typedef struct node {
 } node;
 
 typedef struct list {
-    node *head;
+    node *head, *tail;
     int ct;
 } list;
 

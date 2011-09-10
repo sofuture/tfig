@@ -13,22 +13,16 @@ node *createnode(double x, double y){
 
 list *ll_new(){
     list *list = malloc(sizeof(list));
-    list->head = NULL;
+    list->head = list->tail = NULL;
     list->ct = 0;
     return list;
 }
 
 void ll_add(double x, double y, list *list){
-    node *current = NULL;
-
     if(list->head == NULL){
-        list->head = createnode(x, y);
+        list->head = list->tail = createnode(x, y);
     } else {
-        current = list->head; 
-        while (current->next!=NULL){
-            current = current->next;
-        }
-        current->next = createnode(x, y);
+        list->tail = list->tail->next = createnode(x, y);
     }
     list->ct++;
 }
