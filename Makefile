@@ -13,5 +13,5 @@ tfig_debug: tfig.c ${OBJS}
 	$(CC) -o $@ $< $(CFLAGS) $(OBJS) $(LIBS) -DDEBUG
 
 clean:
-	rm -rf tfig *.o
+	rm -rf tfig tfig_debug *.o
 
