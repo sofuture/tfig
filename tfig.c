@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -104,10 +105,6 @@ static settings *init_settings(){
 static settings *parse_opts(int argc, char **argv){
     int c = 0;
     settings *s = init_settings();
-
-#if defined(__linux__)
-    extern char* optarg;
-#endif
 
     bool specdim = false;
 
