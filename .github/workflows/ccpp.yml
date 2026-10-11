@@ -6,8 +6,14 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
-    
+
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
     - name: make
       run: make
+    - name: test
+      run: make test
+    - name: asan
+      run: |
+        gcc -std=c99 -Wall -Wextra -pedantic -O1 -g -fsanitize=address,undefined -o tfig_asan tfig.c ll.c -lm
+        TFIG=./tfig_asan ./run_tests
