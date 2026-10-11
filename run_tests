@@ -129,6 +129,15 @@ expect_success "y origin" "5 0" "$five_zero" -h 4 -w 8 -s X
 expect_success "far cluster" "$(awk 'BEGIN { for (i = 1000; i <= 1005; i++) print i, i }')" \
     "$far" -h 6 -w 12 -s X
 
+expect_success "fractional" "$(printf '0.25 0.25\n0.5 0.5\n0.75 0.75')" \
+    "$(printf '|     X\n|   X  \n|X     \n+------')" -h 3 -w 6 -s X
+
+expect_success "fractional bounds" "0.5 0.5" "$(printf '| X\n|  \n+--')" \
+    -x 0 -X 1 -y 0.25 -Y 0.75 -h 2 -w 2 -s X
+
+expect_success "huge coordinate" "$(printf '1e20 1\n2e20 2')" "$(printf '|   X\n|X   \n+----')" \
+    -h 2 -w 4 -s X
+
 expect_success "partial xmin" "1 1" "$partial" -x 0 -h 5 -w 5 -s X
 
 expect_success "partial xmax" "1 1" "$(printf '|     \n|     \n|     \n|     \n|X    \n+-----')" \
@@ -197,7 +206,8 @@ expect_fail "partial inverted" "1 1" -x 10 -h 4 -w 4 -s X
 expect_fail "non-numeric" "$(printf '1 1\nfoo\n3 9')" -h 4 -w 4 -s X
 expect_fail "infinity" "inf 1" -h 4 -w 4 -s X
 expect_fail "nan" "nan 1" -h 4 -w 4 -s X
-expect_fail "huge coordinate" "1e20 1" -h 4 -w 4 -s X
+expect_fail "range too large" "$(printf -- '-1e308 0\n1e308 1')" -h 4 -w 4 -s X
+expect_fail "bad bound" "1 1" -x abc -h 4 -w 4 -s X
 expect_fail "unknown option" "1 1" -z
 
 if ! "$TFIG" -h >/dev/null 2>"$TMP/err"; then

@@ -89,10 +89,10 @@ static void getdims(void) {
 }
 
 typedef struct settings {
-    int xmin;
-    int xmax;
-    int ymin;
-    int ymax;
+    double xmin;
+    double xmax;
+    double ymin;
+    double ymax;
     int height;
     int width;
     bool have_xmin;
@@ -113,7 +113,7 @@ static void usage(const char *prog) {
         "usage: %s [-x xmin] [-X xmax] [-y ymin] [-Y ymax]\n"
         "          [-w width] [-h height] [-s symbol]\n"
         "symbol is one character; width and height are 1..%d\n"
-        "ranges are inclusive; omitted bounds fit the data\n",
+        "bounds may be fractional and are inclusive; omitted bounds fit the data\n",
         prog, MAX_DIM);
     exit(1);
 }
@@ -129,6 +129,20 @@ static int parse_int(const char *s, int *out) {
     if (*end != '\0' || errno == ERANGE || v < INT_MIN || v > INT_MAX)
         return -1;
     *out = (int)v;
+    return 0;
+}
+
+static int parse_double(const char *s, double *out) {
+    char *end;
+    double v;
+
+    if (!s || !s[0])
+        return -1;
+    errno = 0;
+    v = strtod(s, &end);
+    if (*end != '\0' || errno == ERANGE || !isfinite(v))
+        return -1;
+    *out = v;
     return 0;
 }
 
@@ -156,55 +170,39 @@ static void init_settings(settings *st) {
     st->sym = '#';
 }
 
-/* Round v to an int bound. On failure, *err is set and *out is unchanged. */
-static int axis_bound(double v, int use_ceil, int *out, const char **err) {
-    double r = use_ceil ? ceil(v) : floor(v);
-
-    if (!isfinite(r) || r < (double)INT_MIN || r > (double)INT_MAX) {
-        *err = "coordinate does not fit in range bounds";
-        return -1;
-    }
-    *out = (int)r;
-    return 0;
-}
-
 /*
  * Fill any bound the user did not set. A point that lands on the max
  * edge stays inside the window; draw_data clamps that bin.
  * A fully omitted axis with no samples becomes [0, 1].
  */
-static int finalize_axis(int *mn, int *mx, bool have_min, bool have_max,
+static int finalize_axis(double *mn, double *mx, bool have_min, bool have_max,
                          double lo, double hi, bool have_points,
                          const char **err) {
-    int next_min = *mn;
-    int next_max = *mx;
+    double next_min = *mn;
+    double next_max = *mx;
 
     if (!have_points) {
         if (!have_min && !have_max) {
             next_min = 0;
             next_max = 1;
         } else if (!have_max) {
-            if (next_min == INT_MAX) {
-                *err = "coordinate does not fit in range bounds";
-                return -1;
-            }
             next_max = next_min + 1;
         } else if (!have_min) {
-            if (next_max == INT_MIN) {
-                *err = "coordinate does not fit in range bounds";
-                return -1;
-            }
             next_min = next_max - 1;
         }
     } else {
-        if (!have_min && axis_bound(lo, 0, &next_min, err) != 0)
-            return -1;
-        if (!have_max && axis_bound(hi, 1, &next_max, err) != 0)
-            return -1;
+        if (!have_min)
+            next_min = lo;
+        if (!have_max)
+            next_max = hi;
     }
 
     if (next_max < next_min) {
         *err = "inverted range (max must be >= min)";
+        return -1;
+    }
+    if (!isfinite(next_max - next_min)) {
+        *err = "range is too large";
         return -1;
     }
     *mn = next_min;
@@ -215,31 +213,32 @@ static int finalize_axis(int *mn, int *mx, bool have_min, bool have_max,
 /* parse getopts for graph settings */
 static void parse_opts(int argc, char **argv, settings *s) {
     int c, v;
+    double d;
 
     while ((c = getopt(argc, argv, "x:X:y:Y:h:w:s:?")) != -1) {
         switch (c) {
             case 'x':
-                if (parse_int(optarg, &v) != 0)
-                    die("invalid integer for -x");
-                s->xmin = v;
+                if (parse_double(optarg, &d) != 0)
+                    die("invalid number for -x");
+                s->xmin = d;
                 s->have_xmin = true;
                 break;
             case 'X':
-                if (parse_int(optarg, &v) != 0)
-                    die("invalid integer for -X");
-                s->xmax = v;
+                if (parse_double(optarg, &d) != 0)
+                    die("invalid number for -X");
+                s->xmax = d;
                 s->have_xmax = true;
                 break;
             case 'y':
-                if (parse_int(optarg, &v) != 0)
-                    die("invalid integer for -y");
-                s->ymin = v;
+                if (parse_double(optarg, &d) != 0)
+                    die("invalid number for -y");
+                s->ymin = d;
                 s->have_ymin = true;
                 break;
             case 'Y':
-                if (parse_int(optarg, &v) != 0)
-                    die("invalid integer for -Y");
-                s->ymax = v;
+                if (parse_double(optarg, &d) != 0)
+                    die("invalid number for -Y");
+                s->ymax = d;
                 s->have_ymax = true;
                 break;
             case 'w':
@@ -269,10 +268,10 @@ static void parse_opts(int argc, char **argv, settings *s) {
     }
 
 #ifdef DEBUG
-    printf("x min: %d\n", s->xmin);
-    printf("x max: %d\n", s->xmax);
-    printf("y min: %d\n", s->ymin);
-    printf("y max: %d\n", s->ymax);
+    printf("x min: %g\n", s->xmin);
+    printf("x max: %g\n", s->xmax);
+    printf("y min: %g\n", s->ymin);
+    printf("y max: %g\n", s->ymax);
     printf("height: %d\n", s->height);
     printf("width: %d\n", s->width);
     printf("symbol: %c\n", s->sym);
@@ -350,21 +349,25 @@ static list *load_data(settings *s) {
     }
 
 #ifdef DEBUG
-    printf("range x: %d .. %d\n", s->xmin, s->xmax);
-    printf("range y: %d .. %d\n", s->ymin, s->ymax);
+    printf("range x: %g .. %g\n", s->xmin, s->xmax);
+    printf("range y: %g .. %g\n", s->ymin, s->ymax);
 #endif
     return data;
 }
 
-static int bin_index(double v, int lo, int hi, int cells) {
-    double span = (double)hi - (double)lo;
+static int bin_index(double v, double lo, double hi, int cells) {
+    double span = hi - lo;
+    double pos;
     int idx;
 
     if (cells <= 0)
         return 0;
     if (span <= 0.0)
         return 0;
-    idx = (int)floor((v - (double)lo) * (double)cells / span);
+    pos = floor((v - lo) / span * (double)cells);
+    if (pos >= (double)cells)
+        return cells - 1;
+    idx = (int)pos;
     if (idx < 0)
         idx = 0;
     if (idx >= cells)
