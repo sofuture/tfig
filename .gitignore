@@ -1,5 +1,6 @@
 *.core
 tfig
 tfig_debug
+tfig_asan
 *.swp
 *.o

@@ -1,39 +1,35 @@
-#include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 
 #include "ll.h"
 
-node *createnode(double x, double y){
-    node *newNode = malloc(sizeof(node));
-    newNode->x = x;
-    newNode->y = y;
-    newNode->next = NULL;
-    return newNode;
+list *ll_new(void) {
+    return calloc(1, sizeof(list));
 }
 
-list *ll_new(){
-    list *list = malloc(sizeof(list));
-    list->head = list->tail = NULL;
-    list->ct = 0;
-    return list;
-}
+int ll_add(list *lp, double x, double y) {
+    if (lp->ct == lp->cap) {
+        size_t ncap = lp->cap ? lp->cap * 2 : 64;
+        point *np;
 
-void ll_add(double x, double y, list *list){
-    if(list->head == NULL){
-        list->head = list->tail = createnode(x, y);
-    } else {
-        list->tail = list->tail->next = createnode(x, y);
+        if (ncap < lp->cap || ncap > SIZE_MAX / sizeof(point))
+            return -1;
+        np = realloc(lp->pts, ncap * sizeof(point));
+        if (!np)
+            return -1;
+        lp->pts = np;
+        lp->cap = ncap;
     }
-    list->ct++;
+
+    lp->pts[lp->ct].x = x;
+    lp->pts[lp->ct].y = y;
+    lp->ct++;
+    return 0;
 }
 
-void ll_free(list * list){
-    node *current = list->head;
-    node *next = current;
-    while(current != NULL){
-        next = current->next;
-        free(current);
-        current = next;
-    }
-    free(list);
+void ll_free(list *lp) {
+    if (!lp)
+        return;
+    free(lp->pts);
+    free(lp);
 }

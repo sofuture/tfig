@@ -1,17 +1,24 @@
 tfig - terminal figures
 =======================
 
+Read pairs of numbers from stdin and draw a scatter plot on the terminal.
+Omitted bounds fit the data exactly. Given bounds may be fractional and are
+inclusive. -s takes one
+character that is one column wide, including a UTF-8 character such as '•'.
+A single sample is drawn in the middle of the plot. -w and -h
+must be between 1 and 10000.
+
 Usage Example
 -------------
 
-$ seq 1 5 | awk '{print $1, $1*$1}' | tfig -x 0 -X 5 -y 0 -Y 5 -h 5 -w 5 -s ?
+$ seq 1 5 | awk '{print $1, $1*$1}' | tfig -x 0 -X 5 -y 0 -Y 5 -h 5 -w 5 -s '?'
 
 Expected Output
 ---------------
 
-|  ?
-|
-|
-| ?
-+_____
-
+|  ?  
+|     
+|     
+| ?   
+|     
++-----

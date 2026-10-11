@@ -1,18 +1,300 @@
 #!/bin/sh
+set -eu
 
-awk 'BEGIN { for(i=1;i<=40;i++) {print (i, i/2)}}' | ./tfig -x 10 -X 30 -y 10 -Y 30 -h 20 -w 40 -s ?
+cd "$(dirname "$0")"
+TFIG=${TFIG:-./tfig}
+TMP=$(mktemp -d)
+trap 'rm -rf "$TMP"' EXIT
 
-awk 'BEGIN { for(i=1;i<=40;i++) {print (i, i/2)}}' | ./tfig -h 20 -w 40
+fail() {
+    printf 'FAIL: %s\n' "$1" >&2
+    exit 1
+}
 
-awk 'BEGIN { for(i=1;i<=5;i++) {print (i, i*i)}}' |  ./tfig -x 0 -X 10 -y 0 -Y 10 -h 10 -w 10 -s ?
+expect_success() {
+    name=$1
+    input=$2
+    expected=$3
+    shift 3
+    if ! printf '%s\n' "$input" | "$TFIG" "$@" >"$TMP/out" 2>"$TMP/err"; then
+        fail "$name: exit nonzero ($(cat "$TMP/err"))"
+    fi
+    printf '%s\n' "$expected" >"$TMP/exp"
+    if ! cmp -s "$TMP/exp" "$TMP/out"; then
+        printf 'FAIL: %s output mismatch\n' "$name" >&2
+        diff -u "$TMP/exp" "$TMP/out" >&2 || true
+        exit 1
+    fi
+    if [ -s "$TMP/err" ]; then
+        fail "$name: unexpected stderr ($(cat "$TMP/err"))"
+    fi
+}
 
-awk 'BEGIN { for(i=1;i<=20;i++) {print (i, i)}}' | ./tfig -x 0 -X 30 -y 0 -Y 30 -h 20 -w 40 -s ?
+expect_fail() {
+    name=$1
+    input=$2
+    shift 2
+    if printf '%s\n' "$input" | "$TFIG" "$@" >"$TMP/out" 2>"$TMP/err"; then
+        fail "$name: expected failure"
+    fi
+    if grep -q Sanitizer "$TMP/err"; then
+        fail "$name: sanitizer error ($(cat "$TMP/err"))"
+    fi
+}
 
-awk 'BEGIN { for(i=1;i<=40;i++) {print (i, i*2)}}' | ./tfig -x 0 -X 30 -y 0 -Y 30 -h 20 -w 40 -s ?
+smoke() {
+    name=$1
+    input=$2
+    lines=$3
+    shift 3
+    if ! printf '%s\n' "$input" | "$TFIG" "$@" >"$TMP/out" 2>"$TMP/err"; then
+        fail "$name: exit nonzero ($(cat "$TMP/err"))"
+    fi
+    if [ -s "$TMP/err" ]; then
+        fail "$name: unexpected stderr ($(cat "$TMP/err"))"
+    fi
+    got=$(wc -l <"$TMP/out" | tr -d ' ')
+    if [ "$got" -ne "$lines" ]; then
+        fail "$name: expected $lines lines, got $got"
+    fi
+}
 
-awk 'BEGIN { for(i=1;i<=40;i++) {print (i, i*2)}}' | ./tfig -h 20 -w 40
+series() {
+    awk "BEGIN { for (i = 1; i <= $1; i++) print i, ($2) }"
+}
 
-awk 'BEGIN { for(i=1;i<=11;i++) {print (i)}}' | ./tfig -x 0 -X 30 -y 0 -Y 30 -h 2 -w 4 -s ?
+readme='|  ?  
+|     
+|     
+| ?   
+|     
++-----'
 
-awk 'BEGIN { for(i=1;i<=11;i++) {print (i)}}' | ./tfig -h 2 -w 4
+diag='|       X
+|      X 
+|     X  
+|    X   
+|   X    
+|  X     
+| X      
+|X       
++--------'
 
+zero='|    
+|  X 
+|    
+|    
++----'
+
+five_zero='|        
+|    X   
+|        
+|        
++--------'
+
+far='|           X
+|         X  
+|       X    
+|    X       
+|  X         
+|X           
++------------'
+
+partial='|     
+|     
+|    X
+|     
+|     
++-----'
+
+edge='|    X
+|     
+|     
+|     
+|     
++-----'
+
+expect_success "readme" "$(seq 1 5 | awk '{print $1, $1*$1}')" "$readme" \
+    -x 0 -X 5 -y 0 -Y 5 -h 5 -w 5 -s '?'
+
+expect_success "autosize integers" "$(series 8 i)" "$diag" -h 8 -w 8 -s X
+
+expect_success "negatives" "$(awk 'BEGIN { for (i = -8; i <= -1; i++) print i, i }')" \
+    "$diag" -h 8 -w 8 -s X
+
+expect_success "origin" "0 0" "$zero" -h 4 -w 4 -s X
+
+expect_success "y origin" "5 0" "$five_zero" -h 4 -w 8 -s X
+
+expect_success "far cluster" "$(awk 'BEGIN { for (i = 1000; i <= 1005; i++) print i, i }')" \
+    "$far" -h 6 -w 12 -s X
+
+bullet=$(printf '\342\200\242')
+expect_success "utf-8 symbol" "$(printf '0 0\n1 1')" "$(printf '|  %s\n|%s  \n+---' "$bullet" "$bullet")" \
+    -h 2 -w 3 -s "$bullet"
+
+expect_success "xmin above data" "1 1" "$(printf '|    \n|    \n+----')" \
+    -x 10 -h 2 -w 4 -s X
+
+expect_success "ymax below data" "$(printf '5 5\n6 6')" "$(printf '|    \n|    \n+----')" \
+    -Y 0 -h 2 -w 4 -s X
+
+expect_success "fractional" "$(printf '0.25 0.25\n0.5 0.5\n0.75 0.75')" \
+    "$(printf '|     X\n|   X  \n|X     \n+------')" -h 3 -w 6 -s X
+
+expect_success "fractional bounds" "0.5 0.5" "$(printf '| X\n|  \n+--')" \
+    -x 0 -X 1 -y 0.25 -Y 0.75 -h 2 -w 2 -s X
+
+expect_success "huge coordinate" "$(printf '1e20 1\n2e20 2')" "$(printf '|   X\n|X   \n+----')" \
+    -h 2 -w 4 -s X
+
+expect_success "partial xmin" "1 1" "$partial" -x 0 -h 5 -w 5 -s X
+
+expect_success "partial xmax" "1 1" "$(printf '|     \n|     \n|X    \n|     \n|     \n+-----')" \
+    -X 5 -h 5 -w 5 -s X
+
+if ! printf '0 0\n10 10\n1000\n' | "$TFIG" -h 2 -w 10 -s X >"$TMP/out" 2>"$TMP/err"; then
+    fail "ignored trailing: exit nonzero ($(cat "$TMP/err"))"
+fi
+if ! grep -q 'trailing unpaired value ignored' "$TMP/err"; then
+    fail "ignored trailing: missing warning"
+fi
+if grep -q Sanitizer "$TMP/err"; then
+    fail "ignored trailing: sanitizer error"
+fi
+printf '%s\n' '|         X
+|X         
++----------' >"$TMP/exp"
+if ! cmp -s "$TMP/exp" "$TMP/out"; then
+    printf 'FAIL: ignored trailing output mismatch\n' >&2
+    diff -u "$TMP/exp" "$TMP/out" >&2 || true
+    exit 1
+fi
+
+expect_success "inclusive max" "5 5" "$edge" -x 0 -X 5 -y 0 -Y 5 -h 5 -w 5 -s X
+
+expect_success "equal explicit" "1 1" "$zero" \
+    -x 1 -X 1 -y 1 -Y 1 -h 4 -w 4 -s X
+
+expect_success "vertical line" "$(printf '5 0\n5 2')" \
+    "$(printf '|  X  \n|     \n|  X  \n+-----')" -h 3 -w 5 -s X
+
+expect_success "empty" "" "$(printf '|  \n|  \n+--')" -h 2 -w 2 -s X
+
+smoke "halves explicit" "$(series 40 'i/2')" 21 \
+    -x 10 -X 30 -y 10 -Y 30 -h 20 -w 40 -s '?'
+smoke "halves auto" "$(series 40 'i/2')" 21 -h 20 -w 40 -s '?'
+smoke "squares" "$(series 5 'i*i')" 11 -x 0 -X 10 -y 0 -Y 10 -h 10 -w 10 -s '?'
+smoke "identity" "$(series 20 i)" 21 -x 0 -X 30 -y 0 -Y 30 -h 20 -w 40 -s '?'
+smoke "steep explicit" "$(series 40 'i*2')" 21 -x 0 -X 30 -y 0 -Y 30 -h 20 -w 40 -s '?'
+smoke "steep auto" "$(series 40 'i*2')" 21 -h 20 -w 40 -s '?'
+smoke "many points" "$(series 1000 i)" 11 -h 10 -w 20 -s X
+
+if ! printf '1\n2\n3\n' | "$TFIG" -x 0 -X 10 -y 0 -Y 10 -h 4 -w 4 -s X >"$TMP/out" 2>"$TMP/err"; then
+    fail "odd count: exit nonzero"
+fi
+if ! grep -q 'trailing unpaired value ignored' "$TMP/err"; then
+    fail "odd count: missing warning"
+fi
+if grep -q Sanitizer "$TMP/err"; then
+    fail "odd count: sanitizer error"
+fi
+printf '%s\n' '|    
+|    
+|    
+|X   
++----' >"$TMP/exp"
+if ! cmp -s "$TMP/exp" "$TMP/out"; then
+    fail "odd count: bad plot"
+fi
+
+expect_fail "zero width" "1 1" -x 0 -X 2 -y 0 -Y 2 -h 4 -w 0 -s X
+expect_fail "negative height" "1 1" -x 0 -X 2 -y 0 -Y 2 -h -3 -w 4 -s X
+expect_fail "huge width" "1 1" -x 0 -X 2 -y 0 -Y 2 -h 10 -w 5000000 -s X
+expect_fail "bad width" "1 1" -x 0 -X 2 -y 0 -Y 2 -h 4 -w abc -s X
+expect_fail "long symbol" "1 1" -x 0 -X 3 -y 0 -Y 3 -h 3 -w 3 -s AB
+expect_fail "empty symbol" "1 1" -h 3 -w 3 -s ''
+expect_fail "two utf-8 symbols" "1 1" -h 3 -w 3 -s "$(printf '\342\200\242\342\200\242')"
+expect_fail "invalid utf-8 symbol" "1 1" -h 3 -w 3 -s "$(printf '\342\200')"
+expect_fail "control symbol" "1 1" -h 3 -w 3 -s "$(printf '\t')"
+expect_fail "wide symbol" "1 1" -h 3 -w 3 -s "$(printf '\344\270\255')"
+expect_fail "emoji symbol" "1 1" -h 3 -w 3 -s "$(printf '\360\237\230\200')"
+expect_fail "line separator symbol" "1 1" -h 3 -w 3 -s "$(printf '\342\200\250')"
+expect_fail "combining symbol" "1 1" -h 3 -w 3 -s "$(printf '\314\201')"
+expect_fail "zwsp symbol" "1 1" -h 3 -w 3 -s "$(printf '\342\200\213')"
+expect_fail "inverted" "1 1" -x 10 -X 0 -y 0 -Y 10 -h 5 -w 5 -s X
+expect_fail "non-numeric" "$(printf '1 1\nfoo\n3 9')" -h 4 -w 4 -s X
+expect_fail "infinity" "inf 1" -h 4 -w 4 -s X
+expect_fail "nan" "nan 1" -h 4 -w 4 -s X
+expect_fail "range too large" "$(printf -- '-1e308 0\n1e308 1')" -h 4 -w 4 -s X
+expect_fail "bad bound" "1 1" -x abc -h 4 -w 4 -s X
+expect_fail "unknown option" "1 1" -z
+
+if ! "$TFIG" -h >/dev/null 2>"$TMP/err"; then
+    :
+else
+    fail "usage: expected failure"
+fi
+if ! grep -q 'usage:' "$TMP/err"; then
+    fail "usage: missing text"
+fi
+
+if [ -w /dev/full ]; then
+    if printf '1 1\n' | "$TFIG" -h 2 -w 4 -s X >/dev/full 2>"$TMP/err"; then
+        fail "full output: expected failure"
+    fi
+    if ! grep -q 'write failed' "$TMP/err"; then
+        fail "full output: missing error"
+    fi
+fi
+
+if "$TFIG" -h 2 -w 4 -s X <. >"$TMP/out" 2>"$TMP/err"; then
+    fail "unreadable input: expected failure"
+fi
+if ! grep -q 'error reading input' "$TMP/err"; then
+    fail "unreadable input: missing error ($(cat "$TMP/err"))"
+fi
+
+# Close the stdout pipe while tfig is stopped, then let it write. With
+# SIGPIPE ignored this is a normal write error rather than a fatal signal.
+python3 - "$TFIG" << 'PY'
+import os, signal, sys
+tfig = sys.argv[1]
+in_r, in_w = os.pipe()
+out_r, out_w = os.pipe()
+err_r, err_w = os.pipe()
+pid = os.fork()
+if pid == 0:
+    os.close(in_w)
+    os.close(out_r)
+    os.close(err_r)
+    os.dup2(in_r, 0)
+    os.dup2(out_w, 1)
+    os.dup2(err_w, 2)
+    os.close(in_r)
+    os.close(out_w)
+    os.close(err_w)
+    os.kill(os.getpid(), signal.SIGSTOP)
+    os.execv(tfig, [tfig, "-h", "4", "-w", "8", "-s", "X"])
+    os._exit(127)
+os.close(in_r)
+os.close(out_w)
+os.close(err_w)
+os.write(in_w, b"1 1\n")
+os.close(in_w)
+os.waitpid(pid, os.WUNTRACED)
+os.close(out_r)
+os.kill(pid, signal.SIGCONT)
+_, status = os.waitpid(pid, 0)
+err = os.read(err_r, 4096)
+os.close(err_r)
+if os.WIFSIGNALED(status):
+    sys.stderr.write("closed pipe: killed by signal %d\n" % os.WTERMSIG(status))
+    sys.exit(1)
+code = os.WEXITSTATUS(status)
+if code != 1 or b"write failed" not in err or b"Sanitizer" in err:
+    sys.stderr.write("closed pipe: status %s err %r\n" % (code, err))
+    sys.exit(1)
+PY
+
+printf 'ok\n'

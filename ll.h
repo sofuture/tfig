@@ -1,19 +1,21 @@
 #ifndef LL_HEADER
 #define LL_HEADER
 
-typedef struct node {
+#include <stddef.h>
+
+typedef struct point {
     double x;
     double y;
-    struct node *next;
-} node;
+} point;
 
 typedef struct list {
-    node *head, *tail;
-    int ct;
+    point *pts;
+    size_t ct;
+    size_t cap;
 } list;
 
-list *ll_new();
-void ll_add(double x, double y, list *list);
-void ll_free(list *list);
+list *ll_new(void);
+int ll_add(list *lp, double x, double y);
+void ll_free(list *lp);
 
 #endif
