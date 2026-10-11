@@ -2,7 +2,8 @@ tfig - terminal figures
 =======================
 
 Read pairs of numbers from stdin and draw a scatter plot on the terminal.
-Omitted bounds fit the data. Given bounds are inclusive. -s takes one
+Omitted bounds fit the data exactly. Given bounds may be fractional and are
+inclusive. -s takes one
 character. -w and -h must be between 1 and 10000.
 
 Usage Example

@@ -129,6 +129,12 @@ expect_success "y origin" "5 0" "$five_zero" -h 4 -w 8 -s X
 expect_success "far cluster" "$(awk 'BEGIN { for (i = 1000; i <= 1005; i++) print i, i }')" \
     "$far" -h 6 -w 12 -s X
 
+expect_success "xmin above data" "1 1" "$(printf '|    \n|    \n+----')" \
+    -x 10 -h 2 -w 4 -s X
+
+expect_success "ymax below data" "$(printf '5 5\n6 6')" "$(printf '|    \n|    \n+----')" \
+    -Y 0 -h 2 -w 4 -s X
+
 expect_success "fractional" "$(printf '0.25 0.25\n0.5 0.5\n0.75 0.75')" \
     "$(printf '|     X\n|   X  \n|X     \n+------')" -h 3 -w 6 -s X
 
@@ -202,7 +208,6 @@ expect_fail "bad width" "1 1" -x 0 -X 2 -y 0 -Y 2 -h 4 -w abc -s X
 expect_fail "long symbol" "1 1" -x 0 -X 3 -y 0 -Y 3 -h 3 -w 3 -s AB
 expect_fail "empty symbol" "1 1" -h 3 -w 3 -s ''
 expect_fail "inverted" "1 1" -x 10 -X 0 -y 0 -Y 10 -h 5 -w 5 -s X
-expect_fail "partial inverted" "1 1" -x 10 -h 4 -w 4 -s X
 expect_fail "non-numeric" "$(printf '1 1\nfoo\n3 9')" -h 4 -w 4 -s X
 expect_fail "infinity" "inf 1" -h 4 -w 4 -s X
 expect_fail "nan" "nan 1" -h 4 -w 4 -s X

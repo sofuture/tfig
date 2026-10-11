@@ -173,7 +173,9 @@ static void init_settings(settings *st) {
 /*
  * Fill any bound the user did not set. A point that lands on the max
  * edge stays inside the window; draw_data clamps that bin.
- * A fully omitted axis with no samples becomes [0, 1].
+ * A fully omitted axis with no samples becomes [0, 1]. When only one bound
+ * is given and the data lies entirely on the wrong side of it, the window
+ * extends one unit from that bound and the plot is empty.
  */
 static int finalize_axis(double *mn, double *mx, bool have_min, bool have_max,
                          double lo, double hi, bool have_points,
@@ -192,9 +194,9 @@ static int finalize_axis(double *mn, double *mx, bool have_min, bool have_max,
         }
     } else {
         if (!have_min)
-            next_min = lo;
+            next_min = (have_max && lo > next_max) ? next_max - 1 : lo;
         if (!have_max)
-            next_max = hi;
+            next_max = (have_min && hi < next_min) ? next_min + 1 : hi;
     }
 
     if (next_max < next_min) {
