@@ -81,15 +81,15 @@ diag='|       X
 +--------'
 
 zero='|    
+|  X 
 |    
 |    
-|X   
 +----'
 
 five_zero='|        
+|    X   
 |        
 |        
-|X       
 +--------'
 
 far='|           X
@@ -102,9 +102,9 @@ far='|           X
 
 partial='|     
 |     
-|     
-|     
 |    X
+|     
+|     
 +-----'
 
 edge='|    X
@@ -150,7 +150,7 @@ expect_success "huge coordinate" "$(printf '1e20 1\n2e20 2')" "$(printf '|   X\n
 
 expect_success "partial xmin" "1 1" "$partial" -x 0 -h 5 -w 5 -s X
 
-expect_success "partial xmax" "1 1" "$(printf '|     \n|     \n|     \n|     \n|X    \n+-----')" \
+expect_success "partial xmax" "1 1" "$(printf '|     \n|     \n|X    \n|     \n|     \n+-----')" \
     -X 5 -h 5 -w 5 -s X
 
 if ! printf '0 0\n10 10\n1000\n' | "$TFIG" -h 2 -w 10 -s X >"$TMP/out" 2>"$TMP/err"; then
@@ -173,8 +173,11 @@ fi
 
 expect_success "inclusive max" "5 5" "$edge" -x 0 -X 5 -y 0 -Y 5 -h 5 -w 5 -s X
 
-expect_success "equal explicit" "1 1" "$(printf '|    \n|    \n|    \n|X   \n+----')" \
+expect_success "equal explicit" "1 1" "$zero" \
     -x 1 -X 1 -y 1 -Y 1 -h 4 -w 4 -s X
+
+expect_success "vertical line" "$(printf '5 0\n5 2')" \
+    "$(printf '|  X  \n|     \n|  X  \n+-----')" -h 3 -w 5 -s X
 
 expect_success "empty" "" "$(printf '|  \n|  \n+--')" -h 2 -w 2 -s X
 
@@ -214,6 +217,11 @@ expect_fail "empty symbol" "1 1" -h 3 -w 3 -s ''
 expect_fail "two utf-8 symbols" "1 1" -h 3 -w 3 -s "$(printf '\342\200\242\342\200\242')"
 expect_fail "invalid utf-8 symbol" "1 1" -h 3 -w 3 -s "$(printf '\342\200')"
 expect_fail "control symbol" "1 1" -h 3 -w 3 -s "$(printf '\t')"
+expect_fail "wide symbol" "1 1" -h 3 -w 3 -s "$(printf '\344\270\255')"
+expect_fail "emoji symbol" "1 1" -h 3 -w 3 -s "$(printf '\360\237\230\200')"
+expect_fail "line separator symbol" "1 1" -h 3 -w 3 -s "$(printf '\342\200\250')"
+expect_fail "combining symbol" "1 1" -h 3 -w 3 -s "$(printf '\314\201')"
+expect_fail "zwsp symbol" "1 1" -h 3 -w 3 -s "$(printf '\342\200\213')"
 expect_fail "inverted" "1 1" -x 10 -X 0 -y 0 -Y 10 -h 5 -w 5 -s X
 expect_fail "non-numeric" "$(printf '1 1\nfoo\n3 9')" -h 4 -w 4 -s X
 expect_fail "infinity" "inf 1" -h 4 -w 4 -s X
@@ -246,5 +254,47 @@ fi
 if ! grep -q 'error reading input' "$TMP/err"; then
     fail "unreadable input: missing error ($(cat "$TMP/err"))"
 fi
+
+# Close the stdout pipe while tfig is stopped, then let it write. With
+# SIGPIPE ignored this is a normal write error rather than a fatal signal.
+python3 - "$TFIG" << 'PY'
+import os, signal, sys
+tfig = sys.argv[1]
+in_r, in_w = os.pipe()
+out_r, out_w = os.pipe()
+err_r, err_w = os.pipe()
+pid = os.fork()
+if pid == 0:
+    os.close(in_w)
+    os.close(out_r)
+    os.close(err_r)
+    os.dup2(in_r, 0)
+    os.dup2(out_w, 1)
+    os.dup2(err_w, 2)
+    os.close(in_r)
+    os.close(out_w)
+    os.close(err_w)
+    os.kill(os.getpid(), signal.SIGSTOP)
+    os.execv(tfig, [tfig, "-h", "4", "-w", "8", "-s", "X"])
+    os._exit(127)
+os.close(in_r)
+os.close(out_w)
+os.close(err_w)
+os.write(in_w, b"1 1\n")
+os.close(in_w)
+os.waitpid(pid, os.WUNTRACED)
+os.close(out_r)
+os.kill(pid, signal.SIGCONT)
+_, status = os.waitpid(pid, 0)
+err = os.read(err_r, 4096)
+os.close(err_r)
+if os.WIFSIGNALED(status):
+    sys.stderr.write("closed pipe: killed by signal %d\n" % os.WTERMSIG(status))
+    sys.exit(1)
+code = os.WEXITSTATUS(status)
+if code != 1 or b"write failed" not in err or b"Sanitizer" in err:
+    sys.stderr.write("closed pipe: status %s err %r\n" % (code, err))
+    sys.exit(1)
+PY
 
 printf 'ok\n'

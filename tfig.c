@@ -8,6 +8,9 @@
 #include <math.h>
 #include <stdint.h>
 #include <fcntl.h>
+#include <signal.h>
+#include <locale.h>
+#include <wchar.h>
 #include <sys/ioctl.h>
 #include <stdbool.h>
 
@@ -113,7 +116,7 @@ static void usage(const char *prog) {
     fprintf(stderr,
         "usage: %s [-x xmin] [-X xmax] [-y ymin] [-Y ymax]\n"
         "          [-w width] [-h height] [-s symbol]\n"
-        "symbol is one printable character (UTF-8 allowed); width and height are 1..%d\n"
+        "symbol is one column wide (UTF-8 allowed); width and height are 1..%d\n"
         "bounds may be fractional and are inclusive; omitted bounds fit the data\n",
         prog, MAX_DIM);
     exit(1);
@@ -147,9 +150,44 @@ static int parse_double(const char *s, double *out) {
     return 0;
 }
 
+/* Classify non-ASCII scalars with wcwidth, which needs a UTF-8 LC_CTYPE. */
+static void init_ctype(void) {
+    const char *tries[] = { "C.UTF-8", "C.utf8", "en_US.UTF-8", "en_US.utf8", NULL };
+    int i;
+
+    for (i = 0; tries[i] != NULL; i++) {
+        if (setlocale(LC_CTYPE, tries[i]) != NULL)
+            return;
+    }
+    setlocale(LC_CTYPE, "");
+}
+
+/* Terminal columns for one scalar, or -1 when it cannot be represented. */
+static int column_width(unsigned long cp) {
+    wchar_t wc;
+
+    if (cp > 0x10ffff)
+        return -1;
+    /* A 16-bit wchar_t cannot hold this scalar, so it cannot be one column here. */
+    if (sizeof(wchar_t) < 4 && cp > 0xffff)
+        return -1;
+    wc = (wchar_t)cp;
+    return wcwidth(wc);
+}
+
+static void ignore_sigpipe(void) {
+    struct sigaction sa;
+
+    memset(&sa, 0, sizeof sa);
+    sa.sa_handler = SIG_IGN;
+    sigemptyset(&sa.sa_mask);
+    sigaction(SIGPIPE, &sa, NULL);
+}
+
 /*
  * Return the byte length of s if it is exactly one printable ASCII character
- * or one well-formed UTF-8 encoded code point, otherwise 0.
+ * or one well-formed UTF-8 scalar that occupies one terminal column.
+ * Wide, combining, and non-printing scalars return 0.
  */
 static size_t single_char_len(const char *s) {
     const unsigned char *p = (const unsigned char *)s;
@@ -179,6 +217,8 @@ static size_t single_char_len(const char *s) {
         return 0;
     if ((len == 3 && cp < 0x800) || (len == 4 && cp < 0x10000) ||
             (cp >= 0xd800 && cp <= 0xdfff) || cp > 0x10ffff || cp < 0xa0)
+        return 0;
+    if (column_width(cp) != 1)
         return 0;
     return len;
 }
@@ -295,7 +335,7 @@ static void parse_opts(int argc, char **argv, settings *s) {
             case 's':
                 s->sym_len = optarg ? single_char_len(optarg) : 0;
                 if (s->sym_len == 0)
-                    die("symbol must be a single printable character");
+                    die("symbol must be a single one-column character");
                 memcpy(s->sym, optarg, s->sym_len + 1);
                 break;
             case ':':
@@ -408,8 +448,9 @@ static int bin_index(double v, double lo, double hi, int cells) {
 
     if (cells <= 0)
         return 0;
-    if (span <= 0.0)
-        return 0;
+    /* A zero-length axis has no position along it; use the middle cell. */
+    if (!(span > 0.0))
+        return cells / 2;
     pos = floor((v - lo) / span * (double)cells);
     if (pos >= (double)cells)
         return cells - 1;
@@ -503,6 +544,8 @@ int main(int argc, char **argv) {
     settings set;
     list *dat;
 
+    init_ctype();
+    ignore_sigpipe();
     init_settings(&set);
     parse_opts(argc, argv, &set);
     dat = load_data(&set);
