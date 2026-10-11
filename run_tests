@@ -129,6 +129,10 @@ expect_success "y origin" "5 0" "$five_zero" -h 4 -w 8 -s X
 expect_success "far cluster" "$(awk 'BEGIN { for (i = 1000; i <= 1005; i++) print i, i }')" \
     "$far" -h 6 -w 12 -s X
 
+bullet=$(printf '\342\200\242')
+expect_success "utf-8 symbol" "$(printf '0 0\n1 1')" "$(printf '|  %s\n|%s  \n+---' "$bullet" "$bullet")" \
+    -h 2 -w 3 -s "$bullet"
+
 expect_success "xmin above data" "1 1" "$(printf '|    \n|    \n+----')" \
     -x 10 -h 2 -w 4 -s X
 
@@ -207,6 +211,9 @@ expect_fail "huge width" "1 1" -x 0 -X 2 -y 0 -Y 2 -h 10 -w 5000000 -s X
 expect_fail "bad width" "1 1" -x 0 -X 2 -y 0 -Y 2 -h 4 -w abc -s X
 expect_fail "long symbol" "1 1" -x 0 -X 3 -y 0 -Y 3 -h 3 -w 3 -s AB
 expect_fail "empty symbol" "1 1" -h 3 -w 3 -s ''
+expect_fail "two utf-8 symbols" "1 1" -h 3 -w 3 -s "$(printf '\342\200\242\342\200\242')"
+expect_fail "invalid utf-8 symbol" "1 1" -h 3 -w 3 -s "$(printf '\342\200')"
+expect_fail "control symbol" "1 1" -h 3 -w 3 -s "$(printf '\t')"
 expect_fail "inverted" "1 1" -x 10 -X 0 -y 0 -Y 10 -h 5 -w 5 -s X
 expect_fail "non-numeric" "$(printf '1 1\nfoo\n3 9')" -h 4 -w 4 -s X
 expect_fail "infinity" "inf 1" -h 4 -w 4 -s X

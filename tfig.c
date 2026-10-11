@@ -99,7 +99,8 @@ typedef struct settings {
     bool have_xmax;
     bool have_ymin;
     bool have_ymax;
-    char sym;
+    char sym[5];
+    size_t sym_len;
 } settings;
 
 static void die(const char *msg) {
@@ -112,7 +113,7 @@ static void usage(const char *prog) {
     fprintf(stderr,
         "usage: %s [-x xmin] [-X xmax] [-y ymin] [-Y ymax]\n"
         "          [-w width] [-h height] [-s symbol]\n"
-        "symbol is one character; width and height are 1..%d\n"
+        "symbol is one printable character (UTF-8 allowed); width and height are 1..%d\n"
         "bounds may be fractional and are inclusive; omitted bounds fit the data\n",
         prog, MAX_DIM);
     exit(1);
@@ -146,6 +147,42 @@ static int parse_double(const char *s, double *out) {
     return 0;
 }
 
+/*
+ * Return the byte length of s if it is exactly one printable ASCII character
+ * or one well-formed UTF-8 encoded code point, otherwise 0.
+ */
+static size_t single_char_len(const char *s) {
+    const unsigned char *p = (const unsigned char *)s;
+    size_t len, i;
+    unsigned long cp;
+
+    if (p[0] >= 0x20 && p[0] < 0x7f)
+        return p[1] == '\0' ? 1 : 0;
+    if (p[0] >= 0xc2 && p[0] <= 0xdf) {
+        len = 2;
+        cp = p[0] & 0x1f;
+    } else if (p[0] >= 0xe0 && p[0] <= 0xef) {
+        len = 3;
+        cp = p[0] & 0x0f;
+    } else if (p[0] >= 0xf0 && p[0] <= 0xf4) {
+        len = 4;
+        cp = p[0] & 0x07;
+    } else {
+        return 0;
+    }
+    for (i = 1; i < len; i++) {
+        if ((p[i] & 0xc0) != 0x80)
+            return 0;
+        cp = (cp << 6) | (p[i] & 0x3f);
+    }
+    if (p[len] != '\0')
+        return 0;
+    if ((len == 3 && cp < 0x800) || (len == 4 && cp < 0x10000) ||
+            (cp >= 0xd800 && cp <= 0xdfff) || cp > 0x10ffff || cp < 0xa0)
+        return 0;
+    return len;
+}
+
 /* set defaults for settings, using the terminal size when it is known */
 static void init_settings(settings *st) {
     getdims();
@@ -167,7 +204,9 @@ static void init_settings(settings *st) {
     st->have_xmax = false;
     st->have_ymin = false;
     st->have_ymax = false;
-    st->sym = '#';
+    st->sym[0] = '#';
+    st->sym[1] = '\0';
+    st->sym_len = 1;
 }
 
 /*
@@ -254,9 +293,10 @@ static void parse_opts(int argc, char **argv, settings *s) {
                 s->height = v;
                 break;
             case 's':
-                if (!optarg || strlen(optarg) != 1)
-                    die("symbol must be a single character");
-                s->sym = optarg[0];
+                s->sym_len = optarg ? single_char_len(optarg) : 0;
+                if (s->sym_len == 0)
+                    die("symbol must be a single printable character");
+                memcpy(s->sym, optarg, s->sym_len + 1);
                 break;
             case ':':
             default:
@@ -276,7 +316,7 @@ static void parse_opts(int argc, char **argv, settings *s) {
     printf("y max: %g\n", s->ymax);
     printf("height: %d\n", s->height);
     printf("width: %d\n", s->width);
-    printf("symbol: %c\n", s->sym);
+    printf("symbol: %s\n", s->sym);
 #endif
 }
 
@@ -382,14 +422,16 @@ static void draw_data(list *dat, settings *set) {
     size_t w = (size_t)set->width;
     size_t h = (size_t)set->height;
     size_t i;
+    size_t row_cap, len;
     unsigned char *dp;
     char *row;
 
-    if (w == 0 || h > SIZE_MAX / w)
+    if (w == 0 || h > SIZE_MAX / w || w > (SIZE_MAX - 2) / set->sym_len)
         die("dimensions too large");
 
+    row_cap = w * set->sym_len + 2;
     dp = calloc(h * w, 1);
-    row = malloc(w + 2);
+    row = malloc(row_cap);
     if (!dp || !row) {
         free(dp);
         free(row);
@@ -414,13 +456,19 @@ static void draw_data(list *dat, settings *set) {
     }
 
     for (int r = set->height - 1; r >= 0; r--) {
-        row[0] = '|';
+        len = 0;
+        row[len++] = '|';
         for (int c = 0; c < set->width; c++) {
             size_t idx = (size_t)r * w + (size_t)c;
-            row[1 + c] = dp[idx] ? set->sym : ' ';
+            if (dp[idx]) {
+                memcpy(row + len, set->sym, set->sym_len);
+                len += set->sym_len;
+            } else {
+                row[len++] = ' ';
+            }
         }
-        row[w + 1] = '\n';
-        if (fwrite(row, 1, w + 2, stdout) != w + 2) {
+        row[len++] = '\n';
+        if (fwrite(row, 1, len, stdout) != len) {
             free(row);
             free(dp);
             ll_free(dat);
