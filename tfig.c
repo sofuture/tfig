@@ -364,6 +364,10 @@ static list *load_data(settings *s) {
         }
     }
 
+    if (ferror(stdin)) {
+        ll_free(data);
+        die("error reading input");
+    }
     if (rc != EOF) {
         ll_free(data);
         die("non-numeric input");
@@ -489,6 +493,10 @@ static void draw_data(list *dat, settings *set) {
 
     free(row);
     free(dp);
+    if (fflush(stdout) != 0 || ferror(stdout)) {
+        ll_free(dat);
+        die("write failed");
+    }
 }
 
 int main(int argc, char **argv) {

@@ -231,4 +231,20 @@ if ! grep -q 'usage:' "$TMP/err"; then
     fail "usage: missing text"
 fi
 
+if [ -w /dev/full ]; then
+    if printf '1 1\n' | "$TFIG" -h 2 -w 4 -s X >/dev/full 2>"$TMP/err"; then
+        fail "full output: expected failure"
+    fi
+    if ! grep -q 'write failed' "$TMP/err"; then
+        fail "full output: missing error"
+    fi
+fi
+
+if "$TFIG" -h 2 -w 4 -s X <. >"$TMP/out" 2>"$TMP/err"; then
+    fail "unreadable input: expected failure"
+fi
+if ! grep -q 'error reading input' "$TMP/err"; then
+    fail "unreadable input: missing error ($(cat "$TMP/err"))"
+fi
+
 printf 'ok\n'
